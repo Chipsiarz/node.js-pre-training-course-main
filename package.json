@@ -24,6 +24,10 @@
     "ts-jest": "^29.1.0"
   },
   "dependencies": {
-    "express": "^5.1.0"
+    "@nestjs/common": "^11.1.7",
+    "@nestjs/core": "^11.1.7",
+    "express": "^5.1.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
   }
 }
