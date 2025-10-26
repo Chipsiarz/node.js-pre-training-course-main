@@ -1,6 +1,7 @@
 // Express.js logging middleware for ToDo API
 function loggingMiddleware(req, res, next) {
-  // TODO: implement logging
+  console.log(`${req.method} ${req.url}`);
+  next();
 }
 
-module.exports = loggingMiddleware; 
+module.exports = loggingMiddleware;
