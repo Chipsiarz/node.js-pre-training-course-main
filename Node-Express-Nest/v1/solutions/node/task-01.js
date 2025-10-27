@@ -180,9 +180,15 @@ class MessageSystem extends EventEmitter {
    */
 
   getStats() {
+    const messagesByType = this.messages.reduce((acc, msg) => {
+      acc[msg.type] = (acc[msg.type] || 0) + 1;
+      return acc;
+    }, {});
+
     return {
       totalMessages: this.messages.length,
       activeUsers: this.getUserCount(),
+      messagesByType,
       lastMessageTime: this.messages.at(-1)?.timestamp || null,
     };
   }
