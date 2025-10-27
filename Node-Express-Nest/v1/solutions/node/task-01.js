@@ -1,4 +1,6 @@
 const EventEmitter = require("events");
+const fs = require("fs");
+const path = require("path");
 
 /**
  * Custom Event Emitter for a messaging system
@@ -9,8 +11,34 @@ class MessageSystem extends EventEmitter {
     super();
     // Initialize the messaging system
     this.messages = [];
-    this.users = new Set();
+    this.users = new Map();
     this.messageId = 1;
+    this.storageFile = path.join(__dirname, "messages.json");
+    this.loadMessages();
+  }
+
+  //Bonus 1: Persistence
+  loadMessages() {
+    try {
+      if (fs.existsSync(this.storageFile)) {
+        const data = fs.readFileSync(this.storageFile, "utf-8");
+        this.messages = JSON.parse(data);
+        console.log("Loaded previous messages from file.");
+      }
+    } catch (err) {
+      console.error("Failed to load message history:", err.message);
+    }
+  }
+
+  saveMessages() {
+    try {
+      fs.writeFileSync(
+        this.storageFile,
+        JSON.stringify(this.messages, null, 2)
+      );
+    } catch (err) {
+      console.error("Failed to save messages:", err.message);
+    }
   }
 
   /**
@@ -33,6 +61,19 @@ class MessageSystem extends EventEmitter {
       throw new Error(`Invalid message type: ${type}`);
     }
 
+    // Bonus 3: Rate limiting (max 5 messages per 10s)
+    if (sender !== "System") {
+      const user = this.users.get(sender);
+      if (user) {
+        const now = Date.now();
+        user.sentMessages = user.sentMessages.filter((t) => now - t < 10_000);
+        if (user.sentMessages.length >= 5) {
+          throw new Error(`${sender} is sending messages too fast.`);
+        }
+        user.sentMessages.push(now);
+      }
+    }
+
     const message = {
       id: this.messageId++,
       type,
@@ -44,6 +85,7 @@ class MessageSystem extends EventEmitter {
     this.messages.push(message);
     if (this.messages.length > 100) this.messages.shift();
 
+    this.saveMessages();
     this.emit("message", message);
     this.emit(type, message);
 
@@ -109,14 +151,14 @@ class MessageSystem extends EventEmitter {
    * @param {string} username - Username to add
    */
 
-  addUser(username) {
+  addUser(username, role = "user") {
     if (!username) return;
     if (!this.users.has(username)) {
-      this.users.add(username);
+      this.users.set(username, { role, sentMessages: [] });
       const message = {
         id: this.messageId++,
         type: "user-joined",
-        content: `${username} joined the system.`,
+        content: `${username} (${role}) joined the system.`,
         timestamp: new Date(),
         sender: "System",
       };
@@ -156,7 +198,7 @@ class MessageSystem extends EventEmitter {
    */
 
   getActiveUsers() {
-    return Array.from(this.users);
+    return Array.from(this.users.keys());
   }
 
   /**
@@ -192,6 +234,32 @@ class MessageSystem extends EventEmitter {
       lastMessageTime: this.messages.at(-1)?.timestamp || null,
     };
   }
+
+  // Bonus 2: Search and filter
+  searchMessages(query) {
+    const lower = query.toLowerCase();
+    return this.messages.filter(
+      (msg) =>
+        msg.content.toLowerCase().includes(lower) ||
+        msg.sender.toLowerCase().includes(lower) ||
+        msg.type.toLowerCase().includes(lower)
+    );
+  }
+
+  // Bonus 4: Check role permissions
+  hasPermission(username, action) {
+    const user = this.users.get(username);
+    if (!user) return false;
+    const role = user.role;
+
+    const permissions = {
+      admin: ["send", "remove", "view"],
+      user: ["send", "view"],
+      guest: ["view"],
+    };
+
+    return permissions[role]?.includes(action);
+  }
 }
 
 // Export the MessageSystem class
@@ -223,6 +291,7 @@ if (isReadyToTest) {
   });
 
   // Add users
+  messenger.addUser("Eve", "admin");
   messenger.addUser("Alice");
   messenger.addUser("Bob");
 
@@ -238,5 +307,22 @@ if (isReadyToTest) {
   console.log(`\nActive users: ${messenger.getUserCount()}`);
   console.log("Recent messages:", messenger.getMessageHistory()?.length);
   console.log("System stats:", messenger.getStats());
+
+  // Check permission
+  console.log("Eve can remove:", messenger.hasPermission("Eve", "remove"));
+  console.log("Alice can remove:", messenger.hasPermission("Alice", "remove"));
+
+  // Rate limiting
+
+  console.log("Testing rate limiting (max 5 messages / 10s):");
+
+  try {
+    for (let i = 1; i <= 6; i++) {
+      messenger.sendMessage("message", `Spam message #${i}`, "Alice");
+      console.log(`Sent message #${i}`);
+    }
+  } catch (err) {
+    console.error(`Rate limit triggered: ${err.message}`);
+  }
 }
 
