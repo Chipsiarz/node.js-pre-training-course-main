@@ -1,0 +1,5 @@
+name,email,phone,birthdate,city
+john doe,JOHN.DOE@EXAMPLE.COM,1234567890,12/25/1990,new york
+jane smith,Jane.Smith@Gmail.Com,555-123-4567,1985-03-15,los angeles
+bob johnson,BOB@TEST.COM,invalid-phone,03/22/1992,chicago
+alice brown,alice.brown@company.org,9876543210,1988/07/04,houstonn
