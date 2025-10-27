@@ -1,6 +1,7 @@
 const fs = require("fs");
 const { Transform } = require("stream");
 const { pipeline } = require("stream/promises");
+const path = require("path");
 
 class CSVParser extends Transform {
   constructor(options = {}) {
@@ -9,6 +10,10 @@ class CSVParser extends Transform {
     // - this.headers = null;
     // - this.lineNumber = 0;
     // - this.buffer = '';
+
+    this.headers = null;
+    this.lineNumber = 0;
+    this.buffer = "";
   }
 
   _transform(chunk, encoding, callback) {
@@ -21,11 +26,38 @@ class CSVParser extends Transform {
     //    - Other lines: create objects with headers as keys
     // 5. Push objects to next stream
 
+    this.buffer += chunk.toString();
+    const lines = this.buffer.split(/\r?\n/);
+    this.buffer = lines.pop();
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      this.lineNumber++;
+
+      const values = line.split(",");
+      if (!this.headers) {
+        this.headers = values.map((h) => h.trim());
+      } else {
+        const record = {};
+        this.headers.forEach(
+          (key, i) => (record[key] = values[i]?.trim() || "")
+        );
+        this.push(record);
+      }
+    }
     callback();
   }
 
   _flush(callback) {
     // TODO: Process any remaining data in buffer
+
+    if (this.buffer.trim() && this.headers) {
+      this.lineNumber++;
+      const values = this.buffer.split(",");
+      const record = {};
+      this.headers.forEach((key, i) => (record[key] = values[i]?.trim() || ""));
+      this.push(record);
+    }
     callback();
   }
 }
@@ -48,7 +80,17 @@ class DataTransformer extends Transform {
     // 5. Capitalize city name
     // 6. Push transformed record
 
-    callback();
+    try {
+      record.name = capitalizeName(record.name);
+      record.email = normalizeEmail(record.email);
+      record.phone = formatPhone(record.phone);
+      record.birthdate = standardizeDate(record.birthdate);
+      record.city = capitalizeName(record.city);
+      this.push(record);
+      callback();
+    } catch (err) {
+      callback(err);
+    }
   }
 }
 
@@ -61,6 +103,9 @@ class CSVWriter extends Transform {
     super({ objectMode: true });
     // TODO: Initialize properties
     // - this.headerWritten = false;
+
+    this.headerWritten = false;
+    this.headers = [];
   }
 
   _transform(record, encoding, callback) {
@@ -70,6 +115,19 @@ class CSVWriter extends Transform {
     // 3. Handle special characters and quotes
     // 4. Push CSV line as string
 
+    if (!this.headerWritten) {
+      this.headers = Object.keys(record);
+      this.push(this.headers.join(",") + "\n");
+      this.headerWritten = true;
+    }
+
+    const line = this.headers
+      .map((key) => {
+        const value = record[key] ?? "";
+        return value.includes(",") ? `"${value}"` : value;
+      })
+      .join(",");
+    this.push(line + "\n");
     callback();
   }
 }
@@ -93,7 +151,18 @@ function capitalizeName(name) {
   // "john doe" → "John Doe"
   // "mary-jane smith" → "Mary-Jane Smith"
 
-  return name;
+  if (!name) return "";
+  return name
+    .split(" ")
+    .map((word) =>
+      word
+        .split("-")
+        .map(
+          (part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+        )
+        .join("-")
+    )
+    .join(" ");
 }
 
 /**
@@ -107,7 +176,10 @@ function normalizeEmail(email) {
   // 2. Validate basic email format (contains @ and .)
   // 3. Return normalized email or original if invalid
 
-  return email;
+  if (!email) return "";
+  const lower = email.toLowerCase();
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return valid.test(lower) ? lower : email;
 }
 
 /**
@@ -122,7 +194,11 @@ function formatPhone(phone) {
   // 3. Format as (XXX) XXX-XXXX
   // 4. Return "INVALID" if not valid
 
-  return phone;
+  if (!phone) return "INVALID";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length === 10)
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return "INVALID";
 }
 
 /**
@@ -140,7 +216,18 @@ function standardizeDate(date) {
   // 3. Validate date is real
   // 4. Return original if invalid
 
-  return date;
+  if (!date) return "";
+  let d = new Date(date);
+  if (isNaN(d)) {
+    const parts = date.split(/[\/\-]/);
+    if (parts.length === 3) {
+      if (parts[2].length === 4) {
+        d = new Date(`${parts[2]}-${parts[0]}-${parts[1]}`);
+      }
+    }
+  }
+  if (isNaN(d)) return date;
+  return d.toISOString().split("T")[0];
 }
 
 /**
@@ -159,8 +246,14 @@ async function processCSVFile(inputPath, outputPath) {
   // 6. Return promise that resolves when complete
 
   try {
-    // Implementation goes here
-    console.log("CSV processing not implemented yet");
+    await pipeline(
+      fs.createReadStream(inputPath),
+      new CSVParser(),
+      new DataTransformer(),
+      new CSVWriter(),
+      fs.createWriteStream(outputPath)
+    );
+    console.log("CSV transformation completed successfully!");
   } catch (error) {
     throw new Error(`Failed to process CSV file: ${error.message}`);
   }
@@ -173,6 +266,18 @@ function createSampleData() {
   // TODO: Create data directory and sample CSV file
   // 1. Create 'data' directory if it doesn't exist
   // 2. Write sample CSV data as specified in task description
+
+  const dir = path.join(__dirname, "data");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+
+  const csv = `name,email,phone,birthdate,city
+john doe,JOHN.DOE@EXAMPLE.COM,1234567890,12/25/1990,new york
+jane smith,Jane.Smith@Gmail.Com,555-123-4567,1985-03-15,los angeles
+bob johnson,BOB@TEST.COM,invalid-phone,03/22/1992,chicago
+alice brown,alice.brown@company.org,9876543210,1988/07/04,houstonn`;
+
+  fs.writeFileSync(path.join(dir, "users.csv"), csv, "utf-8");
+  console.log("Sample CSV file created: data/users.csv");
 }
 
 // Export classes and functions
@@ -187,9 +292,9 @@ module.exports = {
   standardizeDate,
   createSampleData,
 };
-
+//
 // Example usage (for testing):
-const isReadyToTest = false;
+const isReadyToTest = true;
 
 if (isReadyToTest) {
   // Create sample data
@@ -209,3 +314,4 @@ if (isReadyToTest) {
       console.error("❌ Error processing file:", error.message);
     });
 }
+
