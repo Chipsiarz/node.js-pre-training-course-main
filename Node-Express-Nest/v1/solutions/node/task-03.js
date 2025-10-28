@@ -19,6 +19,49 @@ function safeParseJson(str) {
   }
 }
 
+// Bonus 3: Implement timeout handling for promises
+function withTimeout(promise, ms = 2000, label = "operation") {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Timeout after ${ms}ms for ${label}`)),
+        ms
+      )
+    ),
+  ]);
+}
+
+// Bonus 2: Tracer for async operation execution
+const tracer = {
+  enabled: true,
+  records: [],
+  mark(name) {
+    const rec = { name, t: Date.now(), iso: new Date().toISOString() };
+    this.records.push(rec);
+    return rec;
+  },
+  clear() {
+    this.records = [];
+  },
+  dump() {
+    return this.records.slice();
+  },
+};
+
+// helper to wrap an async function and trace start/end
+async function traceAsync(label, fn) {
+  if (tracer.enabled) tracer.mark(`${label} - start`);
+  try {
+    const res = await fn();
+    if (tracer.enabled) tracer.mark(`${label} - end`);
+    return res;
+  } catch (err) {
+    if (tracer.enabled) tracer.mark(`${label} - error`);
+    throw err;
+  }
+}
+
 /**
  * Analyze execution order of event loop phases
  * @returns {object} Analysis of execution order
@@ -82,9 +125,9 @@ function analyzeEventLoop() {
     "sync start",
     "process.nextTick",
     "Promise.then",
-    "setTimeout",
-    "fs.readFile callback",
-    "setImmediate",
+    "setTimeout (timers)",
+    "fs.readFile callback (poll)",
+    "setImmediate (check)",
     "sync end",
   ];
 
@@ -98,6 +141,7 @@ function analyzeEventLoop() {
     "Microtasks flush completely before Node moves to the next event loop phase.",
   ];
 
+  const recorded = tracer.dump().map((r) => `${r.iso} ${r.name}`);
   return {
     phases,
     phasesDetailed,
@@ -105,6 +149,7 @@ function analyzeEventLoop() {
     executionOrderPrinciples,
     executionOrder,
     explanations,
+    recordedExecution: recorded,
   };
 }
 
@@ -182,22 +227,36 @@ async function fixRaceCondition(
   await Promise.all(
     files.map(async (f) => {
       try {
-        await fsPromises.access(f, fs.constants.R_OK);
+        await withTimeout(
+          fsPromises.access(f, fs.constants.R_OK),
+          1500,
+          `access ${f}`
+        );
       } catch {
-        await fsPromises.writeFile(f, `Content of ${f}`, "utf8");
+        await withTimeout(
+          fsPromises.writeFile(f, `Content of ${f}`, "utf8"),
+          1500,
+          `write ${f}`
+        );
+        logWithPhase(`Created ${f}`, "success");
       }
     })
   );
 
-  const readers = files.map((f, idx) =>
-    fsPromises.readFile(f, "utf8").then((content) => {
-      results[idx] = content.toUpperCase();
-    })
+  await Promise.all(
+    files.map((f, idx) =>
+      traceAsync(`read:${f}`, async () => {
+        const content = await withTimeout(
+          fsPromises.readFile(f, "utf8"),
+          2000,
+          `read ${f}`
+        );
+        results[idx] = content.toUpperCase();
+      })
+    )
   );
 
-  await Promise.all(readers);
-
-  console.log(now(), "All files processed:", results);
+  logWithPhase(`All files processed: ${JSON.stringify(results)}`, "success");
   return results;
 }
 
@@ -222,7 +281,11 @@ async function fixCallbackHell(userId) {
 
   async function readJsonSafe(path) {
     try {
-      const raw = await fsPromises.readFile(path, "utf8");
+      const raw = await withTimeout(
+        fsPromises.readFile(path, "utf8"),
+        2000,
+        `read ${path}`
+      );
       const parsed = safeParseJson(raw);
       if (!parsed) throw new Error(`Invalid JSON in ${path}`);
       return parsed;
@@ -232,9 +295,15 @@ async function fixCallbackHell(userId) {
   }
 
   try {
-    const user = await readJsonSafe(userFile);
-    const preferences = await readJsonSafe(prefFile);
-    const activity = await readJsonSafe(activityFile);
+    const user = await traceAsync(`readJson:${userFile}`, () =>
+      readJsonSafe(userFile)
+    );
+    const preferences = await traceAsync(`readJson:${prefFile}`, () =>
+      readJsonSafe(prefFile)
+    );
+    const activity = await traceAsync(`readJson:${activityFile}`, () =>
+      readJsonSafe(activityFile)
+    );
 
     const combinedData = {
       user,
@@ -243,40 +312,52 @@ async function fixCallbackHell(userId) {
       processedAt: new Date().toISOString(),
     };
 
-    await fsPromises.writeFile(
-      outFile,
-      JSON.stringify(combinedData, null, 2),
-      "utf8"
+    await withTimeout(
+      fsPromises.writeFile(
+        outFile,
+        JSON.stringify(combinedData, null, 2),
+        "utf8"
+      ),
+      2000,
+      `write ${outFile}`
     );
-    console.log(now(), "Processed user data written to", outFile);
+    logWithPhase(`Processed user data written to ${outFile}`, "success");
     return combinedData;
   } catch (err) {
-    console.error(now(), "Error processing user data:", err.message);
+    logWithPhase(`Error processing user data: ${err.message}`, "error");
 
     try {
-      await fsPromises.writeFile(
-        userFile,
-        JSON.stringify(
-          { id: userId, name: "Sample", email: "sample@example.com" },
-          null,
-          2
-        )
-      );
-      await fsPromises.writeFile(
-        prefFile,
-        JSON.stringify({ theme: "dark", language: "en" }, null, 2)
-      );
-      await fsPromises.writeFile(
-        activityFile,
-        JSON.stringify(
-          { lastLogin: new Date().toISOString(), sessionsCount: 1 },
-          null,
-          2
-        )
-      );
-      console.log(now(), "Created sample files. Please run again.");
+      await Promise.all([
+        fsPromises.writeFile(
+          userFile,
+          JSON.stringify(
+            { id: userId, name: "Sample", email: "sample@example.com" },
+            null,
+            2
+          ),
+          "utf8"
+        ),
+        fsPromises.writeFile(
+          prefFile,
+          JSON.stringify({ theme: "dark", language: "en" }, null, 2),
+          "utf8"
+        ),
+        fsPromises.writeFile(
+          activityFile,
+          JSON.stringify(
+            { lastLogin: new Date().toISOString(), sessionsCount: 1 },
+            null,
+            2
+          ),
+          "utf8"
+        ),
+      ]);
+      logWithPhase("Created sample files. Please run again.", "warn");
     } catch (writeErr) {
-      console.error(now(), "Failed creating sample files:", writeErr.message);
+      logWithPhase(
+        `Failed creating sample files: ${writeErr.message}`,
+        "error"
+      );
     }
 
     throw err;
@@ -299,29 +380,45 @@ async function fixMixedAsync() {
   const outputFile = "output.txt";
 
   try {
-    console.log("processing");
-    const data = await fsPromises.readFile(inputFile, "utf8");
-    console.log("File read successfully");
+    logWithPhase("Processing input file...", "info");
+    const data = await withTimeout(
+      fsPromises.readFile(inputFile, "utf8"),
+      2000,
+      `read ${inputFile}`
+    );
+    logWithPhase("File read successfully", "success");
 
     const processedData = data.toUpperCase();
 
-    await fsPromises.writeFile(outputFile, processedData, "utf8");
-    console.log("File written successfully");
+    await withTimeout(
+      fsPromises.writeFile(outputFile, processedData, "utf8"),
+      2000,
+      `write ${outputFile}`
+    );
+    logWithPhase("File written successfully", "success");
 
-    const verifyData = await fsPromises.readFile(outputFile, "utf8");
-    console.log("Verification successful");
-    console.log("Data length:", verifyData.length);
+    const verifyData = await withTimeout(
+      fsPromises.readFile(outputFile, "utf8"),
+      2000,
+      `read ${outputFile}`
+    );
+    logWithPhase("Verification successful", "success");
+    logWithPhase(`Data length: ${verifyData.length}`, "info");
 
-    console.log("completed");
+    logWithPhase("completed", "success");
+    return true;
   } catch (error) {
     if (error && error.code === "ENOENT") {
-      console.log("input file not found, creating one...");
+      logWithPhase("Input file not found, creating one...", "warn");
       await fsPromises.writeFile(inputFile, "Hello World!", "utf8");
-      console.log("Created input file, please run again");
+      logWithPhase("Created input file, please run again", "warn");
+      return false;
     } else {
-      console.error(
-        "Error in fixMixedAsync:",
-        error && error.message ? error.message : error
+      logWithPhase(
+        `Error in fixMixedAsync: ${
+          error && error.message ? error.message : error
+        }`,
+        "error"
       );
       throw error;
     }
@@ -341,34 +438,61 @@ async function demonstrateEventLoop() {
   // 5. Show close callbacks phase
   // 6. Demonstrate microtask priority (nextTick, Promises)
 
-  console.log("DEMO: start (sync)");
+  logWithPhase("DEMO: start (sync)", "demo");
 
-  process.nextTick(() => console.log("DEMO: process.nextTick (microtask)"));
-  console.log("nextTick");
+  tracer.clear();
+  tracer.mark("demo:start");
 
-  Promise.resolve()
-    .then(() => console.log("DEMO: Promise.then (microtask)"))
-    .catch(() => {});
-  console.log("promises");
+  process.nextTick(() => {
+    tracer.mark("process.nextTick");
+    console.log("DEMO: process.nextTick (microtask)");
+  });
+
+  Promise.resolve().then(() => {
+    tracer.mark("promise.then");
+    console.log("DEMO: Promise.then (microtask)");
+  });
 
   setTimeout(() => {
+    tracer.mark("setTimeout");
     console.log("DEMO: setTimeout (timers)");
-    console.log("timers");
   }, 0);
 
   setImmediate(() => {
+    tracer.mark("setImmediate");
     console.log("DEMO: setImmediate (check)");
-    console.log("immediate");
   });
 
   fs.readFile(__filename, () => {
+    tracer.mark("fs.readFile callback");
     console.log("DEMO: fs.readFile callback (poll)");
-    setTimeout(() => console.log("DEMO: timer inside readFile"), 0);
-    setImmediate(() => console.log("DEMO: immediate inside readFile"));
-    process.nextTick(() => console.log("DEMO: nextTick inside readFile"));
+
+    process.nextTick(() => {
+      tracer.mark("nextTick-inside-read");
+      console.log("DEMO: nextTick inside readFile");
+    });
+
+    setImmediate(() => {
+      tracer.mark("setImmediate-inside-read");
+      console.log("DEMO: immediate inside readFile");
+    });
+
+    setTimeout(() => {
+      tracer.mark("setTimeout-inside-read");
+      console.log("DEMO: timer inside readFile");
+    }, 0);
   });
 
-  console.log("DEMO: end (sync)");
+  logWithPhase("DEMO: end (sync)", "demo");
+  tracer.mark("demo:end");
+
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      tracer.mark("demo:complete");
+      console.log("DEMO: demonstration completed");
+      resolve(tracer.dump());
+    }, 150);
+  });
 }
 
 /**
@@ -411,22 +535,93 @@ async function createTestFiles() {
   );
 
   await Promise.all(promises);
-  console.log(now(), "Test files created");
+  logWithPhase("Test files created", "success");
+  return Object.keys(testData);
 }
+
+// Bonus 4: comprehensive logging for debugging (with colors if terminal supports)
+const supportsColor = process.stdout && process.stdout.isTTY;
+const colors = {
+  reset: supportsColor ? "\x1b[0m" : "",
+  gray: supportsColor ? "\x1b[90m" : "",
+  green: supportsColor ? "\x1b[32m" : "",
+  yellow: supportsColor ? "\x1b[33m" : "",
+  red: supportsColor ? "\x1b[31m" : "",
+  cyan: supportsColor ? "\x1b[36m" : "",
+};
 
 /**
  * Helper function to log with timestamps
  * @param {string} message - Message to log
  * @param {string} phase - Event loop phase
  */
-function logWithPhase(message, phase = "unknown") {
+function logWithPhase(message, phase = "info") {
   // TODO: Implement detailed logging
   // 1. Add timestamp
   // 2. Add event loop phase information
   // 3. Add color coding for different phases
   // 4. Format output for better readability
 
-  console.log(`[${phase}] ${now()} - ${message}`);
+  // Bonus 4: enhanced logWithPhase (keeps previous simple messages for compatibility)
+  const prefix = `[${phase}] ${now()} -`;
+  if (tracer.enabled)
+    tracer.mark(`log:${phase}:${String(message).split("\n")[0]}`);
+  if (supportsColor) {
+    let color = colors.cyan;
+    if (phase.includes("error") || phase === "error") color = colors.red;
+    else if (phase.includes("warn") || phase === "warn") color = colors.yellow;
+    else if (phase.includes("success") || phase === "success")
+      color = colors.green;
+    console.log(`${color}${prefix} ${message}${colors.reset}`);
+  } else {
+    console.log(`${prefix} ${message}`);
+  }
+}
+
+/**
+ * Bonus 1: Create a visual diagram of event loop phases
+ * returns ASCII and JSON diagrams
+ */
+function generateEventLoopDiagram() {
+  const diagramAscii = [
+    "Node.js Event Loop (simplified):",
+    "",
+    "  [top-level sync code]",
+    "         |",
+    "     [microtasks]",
+    "  (process.nextTick -> Promise.then)",
+    "         |",
+    "  -------------------------------",
+    "  | timers | pending callbacks |",
+    "  |  poll  |    idle/prepare   |",
+    "  | check  | close callbacks   |",
+    "  -------------------------------",
+    " (timers -> pending callbacks -> poll -> check -> close)",
+  ].join("\n");
+
+  const diagramJson = {
+    flow: [
+      "sync",
+      "microtasks (process.nextTick, Promise.then)",
+      "timers (setTimeout/setInterval)",
+      "pending callbacks",
+      "idle/prepare",
+      "poll (I/O callbacks)",
+      "check (setImmediate)",
+      "close callbacks",
+    ],
+    note: "process.nextTick runs before other microtasks. Microtasks flush before moving to next phase.",
+  };
+
+  return { ascii: diagramAscii, json: diagramJson };
+}
+
+/**
+ * Bonus 2 (helper API): dump tracer records in readable format
+ */
+function dumpTracer() {
+  const recs = tracer.dump();
+  return recs.map((r) => `${r.iso} - ${r.name}`).join("\n");
 }
 
 // Export functions and data
@@ -439,6 +634,11 @@ module.exports = {
   demonstrateEventLoop,
   createTestFiles,
   logWithPhase,
+  withTimeout,
+  tracer,
+  traceAsync,
+  generateEventLoopDiagram,
+  dumpTracer,
 };
 
 // Example usage (for testing):

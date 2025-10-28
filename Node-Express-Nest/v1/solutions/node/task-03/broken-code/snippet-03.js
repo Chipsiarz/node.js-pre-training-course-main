@@ -31,3 +31,4 @@ if (require.main === module) {
   processData().catch(() => {});
 }
 
+module.exports = { processData };

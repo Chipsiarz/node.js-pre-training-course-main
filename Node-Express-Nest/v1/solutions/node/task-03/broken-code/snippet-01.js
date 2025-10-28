@@ -30,3 +30,4 @@ if (require.main === module) {
   processFiles().catch((err) => console.error("Error:", err));
 }
 
+module.exports = { processFiles };
