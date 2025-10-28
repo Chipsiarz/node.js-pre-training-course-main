@@ -57,9 +57,7 @@ class CSVParser extends Transform {
         this.push(record);
       }
 
-      if (this.lineNumber % 10 === 0) {
-        this.emit("progress", { lines: this.lineNumber });
-      }
+      this.emit("progress", { lines: this.lineNumber });
     }
     callback();
   }
