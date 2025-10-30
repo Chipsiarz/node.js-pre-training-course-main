@@ -1,5 +1,81 @@
 const http = require("http");
 const url = require("url");
+const fs = require("fs");
+const path = require("path");
+
+// Bonus 2: Simple rate limiter (per-IP)
+const RATE_WINDOW_MS = 60_000;
+const RATE_MAX = 120;
+const rateMap = new Map();
+
+function checkRateLimit(req, res) {
+  const ip =
+    req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown";
+  const now = Date.now();
+  let entry = rateMap.get(ip);
+  if (!entry) {
+    entry = { count: 1, start: now };
+    rateMap.set(ip, entry);
+    return true;
+  }
+  if (now - entry.start > RATE_WINDOW_MS) {
+    entry.count = 1;
+    entry.start = now;
+    rateMap.set(ip, entry);
+    return true;
+  }
+  entry.count++;
+  if (entry.count > RATE_MAX) {
+    sendResponse(res, 429, { success: false, error: "Too many requests" });
+    endRequestLog(req, res, { status: 429 });
+    return false;
+  }
+  rateMap.set(ip, entry);
+  return true;
+}
+
+// Bonus 1: Request logging middleware
+function startRequestLog(req) {
+  req._startAt = process.hrtime();
+}
+function endRequestLog(req, res, extra = {}) {
+  if (!req._startAt) return;
+  const diff = process.hrtime(req._startAt);
+  const ms = (diff[0] * 1e3 + diff[1] / 1e6).toFixed(2);
+  const entry = {
+    method: req.method,
+    url: req.url,
+    status: res.statusCode || extra.status || 200,
+    durationMs: ms,
+    ...extra,
+  };
+  console.log(
+    `[REQ] ${entry.method} ${req.url} -> ${entry.status} (${entry.durationMs}ms)`
+  );
+}
+
+// Bonus 3: persistence to disk
+const DATA_FILE = path.join(__dirname, "todos.json");
+
+function loadTodosFromDisk() {
+  try {
+    if (!fs.existsSync(DATA_FILE)) return null;
+    const raw = fs.readFileSync(DATA_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.todos)) return parsed;
+    return null;
+  } catch (err) {
+    console.warn("Could not load todos from disk:", err && err.message);
+    return null;
+  }
+}
+
+async function saveTodosToDisk(todos, nextId) {
+  const payload = { todos, nextId };
+  const tmp = DATA_FILE + ".tmp";
+  await fs.promises.writeFile(tmp, JSON.stringify(payload, null, 2), "utf8");
+  await fs.promises.rename(tmp, DATA_FILE);
+}
 
 /**
  * Todo REST API Server
@@ -71,12 +147,23 @@ function parsePathParams(pattern, path) {
  */
 function sendResponse(res, statusCode, payload) {
   const json = JSON.stringify(payload || {});
+
   res.writeHead(statusCode, {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
   });
+
+  try {
+    if (res && res._req) {
+      endRequestLog(res._req, res, { status: statusCode });
+    }
+  } catch (e) {
+    // logging failure should not break response
+    console.warn("Logging failed:", e && e.message);
+  }
+
   res.end(json);
 }
 
@@ -124,6 +211,36 @@ function validateTodo(todoData, isUpdate = false) {
   return { isValid: errors.length === 0, errors };
 }
 
+// --- Bonus 4: Serve simple HTML client (put at top-level) ---
+function serveClientHtml(res) {
+  const html = `<!doctype html>
+    <html>
+    <head><meta charset="utf-8"><title>Todos UI</title></head>
+    <body>
+      <h1>Mini Todos UI</h1>
+      <div id="app"></div>
+      <script>
+        async function api(path, opts = {}) {
+          const r = await fetch(path, opts);
+          return r.json();
+        }
+        async function render() {
+          const out = document.getElementById('app');
+          try {
+            const data = await api('/todos');
+            out.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+          } catch (e) {
+            out.innerText = 'Failed to load /todos: ' + (e && e.message);
+          }
+        }
+        render();
+      </script>
+    </body>
+    </html>`;
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(html);
+}
+
 /**
  * TodoServer Class - Main HTTP server for Todo API
  */
@@ -133,13 +250,22 @@ class TodoServer {
     this.todos = [];
     this.nextId = 1;
     this.initializeSampleData();
-    this.handleRequest = this.handleRequest.bind(this);
+    this.handleRequest = this.handleRequestWrapper.bind(this);
   }
 
   /**
    * Initialize server with sample todo data
    */
   initializeSampleData() {
+    const disk = loadTodosFromDisk();
+    if (disk && Array.isArray(disk.todos) && disk.todos.length > 0) {
+      this.todos = disk.todos;
+      this.nextId =
+        disk.nextId || Math.max(...this.todos.map((t) => t.id), 0) + 1;
+      console.log("Loaded todos from disk:", DATA_FILE);
+      return;
+    }
+
     const now = new Date().toISOString();
     this.todos = [
       {
@@ -159,13 +285,19 @@ class TodoServer {
         updatedAt: now,
       },
     ];
+
+    saveTodosToDisk(this.todos, this.nextId).catch((e) =>
+      console.warn("Failed to save initial todos:", e && e.message)
+    );
   }
 
   /**
    * Start the HTTP server
    */
   start() {
-    this.server = http.createServer(this.handleRequest);
+    this.server = http.createServer((req, res) =>
+      this.handleRequestWrapper(req, res)
+    );
     this.server.on("error", (err) => {
       console.error("Server error:", err);
     });
@@ -180,27 +312,44 @@ class TodoServer {
    * @param {IncomingMessage} req - HTTP request
    * @param {ServerResponse} res - HTTP response
    */
-  async handleRequest(req, res) {
-    const parsedUrl = url.parse(req.url, true);
+
+  async handleRequestWrapper(req, res) {
+    // attach request to response so sendResponse can access it
+    res._req = req;
+
+    // start timing/logging
+    startRequestLog(req);
+
+    // rate limiting
+    if (!checkRateLimit(req, res)) {
+      // checkRateLimit already sent 429 and logged
+      return;
+    }
+
+    const parsedUrl = url.parse(req.url || "", true);
     const pathname = parsedUrl.pathname || "/";
     const method = (req.method || "GET").toUpperCase();
 
-    // Simple request logging
-    console.log(`${method} ${pathname}`);
-
-    // handle OPTIONS
+    // handle OPTIONS (CORS preflight)
     if (method === "OPTIONS") {
-      // respond with CORS headers
       res.writeHead(204, {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type",
       });
+      endRequestLog(req, res, { status: 204 });
       return res.end();
     }
 
     try {
-      // Routing
+      // Bonus: serve simple client UI on root
+      if (method === "GET" && pathname === "/") {
+        serveClientHtml(res);
+        endRequestLog(req, res, { status: 200 });
+        return;
+      }
+
+      // Routes (use this.*)
       if (method === "GET" && pathname === "/todos") {
         return this.getAllTodos(req, res, parsedUrl.query);
       }
@@ -299,6 +448,8 @@ class TodoServer {
   async createTodo(req, res) {
     try {
       const body = await parseBody(req);
+
+      // validate request body
       const { isValid, errors } = validateTodo(body, false);
       if (!isValid) {
         return sendResponse(res, 400, {
@@ -306,6 +457,7 @@ class TodoServer {
           error: errors.join("; "),
         });
       }
+
       const now = new Date().toISOString();
       const newTodo = {
         id: this.generateNextId(),
@@ -317,6 +469,11 @@ class TodoServer {
         updatedAt: now,
       };
       this.todos.push(newTodo);
+
+      saveTodosToDisk(this.todos, this.nextId).catch((e) =>
+        console.warn("Failed to save todos after create:", e && e.message)
+      );
+
       return sendResponse(res, 201, { success: true, data: newTodo });
     } catch (err) {
       if (err && err.message === "Invalid JSON") {
@@ -368,6 +525,10 @@ class TodoServer {
       todo.updatedAt = new Date().toISOString();
 
       this.todos[idx] = todo;
+      saveTodosToDisk(this.todos, this.nextId).catch((e) =>
+        console.warn("Failed to save todos after update:", e && e.message)
+      );
+
       return sendResponse(res, 200, { success: true, data: todo });
     } catch (err) {
       if (err && err.message === "Invalid JSON") {
@@ -399,6 +560,10 @@ class TodoServer {
         error: "Todo not found",
       });
     this.todos.splice(idx, 1);
+    saveTodosToDisk(this.todos, this.nextId).catch((e) =>
+      console.warn("Failed to save todos after delete:", e && e.message)
+    );
+
     return sendResponse(res, 200, {
       success: true,
       message: "Todo deleted successfully",
@@ -460,6 +625,17 @@ if (isReadyToTest) {
   // Start server for testing
   const server = new TodoServer(3000);
   server.start();
+
+  process.on("SIGINT", async () => {
+    console.log("SIGINT received — saving todos to disk...");
+    try {
+      await saveTodosToDisk(server.todos, server.nextId);
+      console.log("Saved todos. Exiting.");
+    } catch (e) {
+      console.warn("Failed to save on exit:", e && e.message);
+    }
+    process.exit();
+  });
 
   console.log("🚀 Todo Server starting...");
   console.log("📝 Replace TODO comments with implementation");
