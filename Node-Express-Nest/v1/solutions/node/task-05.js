@@ -62,28 +62,60 @@ class AnalyticsTracker {
       dailyStats: {},
     };
   }
-  _bumpDaily(field) {
-    // TODO: implement daily stats tracking
-    // - use YYYY-MM-DD date keys
-    // - track created, updated, deleted, views per day
+
+  _todayKey() {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
   }
+
+  _ensureDay(key) {
+    if (!this.stats.dailyStats[key]) {
+      this.stats.dailyStats[key] = {
+        created: 0,
+        updated: 0,
+        deleted: 0,
+        views: 0,
+      };
+    }
+  }
+
+  _bumpDaily(field) {
+    const key = this._todayKey();
+    this._ensureDay(key);
+    if (field in this.stats.dailyStats[key]) {
+      this.stats.dailyStats[key][field]++;
+    }
+  }
+
   trackCreated() {
-    // TODO: implement tracking logic
+    this.stats.totalCreated++;
+    this._bumpDaily("created");
   }
   trackUpdated() {
-    // TODO: implement tracking logic
+    this.stats.totalUpdated++;
+    this._bumpDaily("updated");
   }
   trackDeleted() {
-    // TODO: implement tracking logic
+    this.stats.totalDeleted++;
+    this._bumpDaily("deleted");
   }
   trackViewed() {
-    // TODO: implement tracking logic
+    this.stats.totalViews++;
+    this._bumpDaily("views");
   }
   trackError() {
-    // TODO: implement tracking logic
+    this.stats.errors++;
   }
+
   getStats() {
-    // TODO: implement stats retrieval
+    return {
+      totalCreated: this.stats.totalCreated,
+      totalUpdated: this.stats.totalUpdated,
+      totalDeleted: this.stats.totalDeleted,
+      totalViews: this.stats.totalViews,
+      errors: this.stats.errors,
+      dailyStats: { ...this.stats.dailyStats },
+    };
   }
 }
 
@@ -136,10 +168,53 @@ function validateTodoPayload(payload, isCreate = false) {
   const errors = [];
   const out = {};
 
-  // TODO: implement full validation logic
-  // - title: required, non-empty string
-  // - description: optional, string
-  // - completed: optional, boolean (default false)
+  if (isCreate || "title" in payload) {
+    if (
+      !("title" in payload) ||
+      payload.title === undefined ||
+      payload.title === null
+    ) {
+      if (isCreate) errors.push("Title is required");
+    } else {
+      if (typeof payload.title !== "string") {
+        errors.push("Title must be a string");
+      } else {
+        const t = payload.title.trim();
+        if (t.length < 1 || t.length > 100) {
+          errors.push("Title must be 1-100 characters and not only whitespace");
+        } else {
+          out.title = t;
+        }
+      }
+    }
+  }
+
+  if ("description" in payload) {
+    if (payload.description == null) {
+      out.description = "";
+    } else if (typeof payload.description !== "string") {
+      errors.push("Description must be a string");
+    } else {
+      if (payload.description.length > 500) {
+        errors.push("Description must be at most 500 characters");
+      } else {
+        out.description = payload.description;
+      }
+    }
+  }
+
+  if ("completed" in payload) {
+    if (typeof payload.completed !== "boolean") {
+      errors.push("Completed must be a boolean");
+    } else {
+      out.completed = payload.completed;
+    }
+  }
+
+  if (isCreate) {
+    if (!("description" in out)) out.description = "";
+    if (!("completed" in out)) out.completed = false;
+  }
 
   return { errors, values: out };
 }
@@ -151,12 +226,20 @@ class TodoServer extends EventEmitter {
     this.todos = [];
     this.nextId = 1;
 
-    // TODO: initialize analytics tracker
-    // TODO: initialize logger
-    // TODO: initialize recent events list keeping last 100 events
+    this.analytics = new AnalyticsTracker();
+    this.logger = new ConsoleLogger();
+    this.recentEvents = [];
+
     this.server = null;
 
+    this.initializeSampleData();
+
     this._wireDefaultListeners();
+  }
+
+  initializeSampleData() {
+    this.todos = [];
+    this.nextId = 1;
   }
 
   _wireDefaultListeners() {
@@ -199,30 +282,319 @@ class TodoServer extends EventEmitter {
    * Start the server
    */
   async start() {
-    // TODO: create HTTP server and bind request handler
-    // TODO: listen on this.port
+    this.server = http.createServer((req, res) => {
+      this._handleRequest(req, res).catch((err) => {
+        try {
+          const requestInfo = {
+            method: req.method,
+            url: req.url,
+            userAgent: req.headers["user-agent"],
+            ip: req.socket.remoteAddress,
+          };
+          this.emit("serverError", {
+            error: err,
+            operation: "_handleRequest",
+            requestInfo,
+            timestamp: nowISO(),
+          });
+        } catch (e) {}
+        try {
+          sendJson(res, 500, {
+            success: false,
+            error: "Internal server error",
+          });
+        } catch (e) {}
+      });
+    });
+
+    await new Promise((resolve) => {
+      this.server.listen(this.port, () => {
+        console.log("=== Todo Server with Events Started ===");
+        console.log(`Server running on http://localhost:${this.port}`);
+        resolve();
+      });
+    });
   }
 
   /**
    * Stop the server
    */
   async stop() {
-    // TODO: stop the HTTP server if running
+    if (!this.server) return;
+    await new Promise((resolve, reject) => {
+      this.server.close((err) => {
+        if (err) return reject(err);
+        this.server = null;
+        resolve();
+      });
+    });
   }
 
   /**
    * Handle incoming requests
    */
   async _handleRequest(req, res) {
-    // TODO: implement CORS preflight handling
-    // TODO: implement routes:
-    // - /todos (GET, POST)
-    // - /todos/:id (GET, PUT, DELETE)
-    // - /analytics (GET)
-    // - /events (GET)
-    // TODO: emit events for CRUD, errors, validation, etc.
-    // TODO: send JSON responses with proper status codes
+    const parsed = url.parse(req.url || "", true);
+    const pathname = parsed.pathname || "/";
+    const method = (req.method || "GET").toUpperCase();
+
+    const requestInfo = {
+      method,
+      url: req.url,
+      userAgent: req.headers["user-agent"] || "",
+      ip:
+        req.socket && req.socket.remoteAddress ? req.socket.remoteAddress : "",
+    };
+
+    if (method === "OPTIONS") {
+      res.writeHead(204, {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      });
+      return res.end();
+    }
+
+    try {
+      // GET /analytics
+      if (method === "GET" && pathname === "/analytics") {
+        const stats = this.analytics.getStats();
+        return sendJson(res, 200, { success: true, data: stats });
+      }
+
+      // GET /events?last=n
+      if (method === "GET" && pathname === "/events") {
+        const last =
+          parseInt(
+            parsed.query && parsed.query.last ? parsed.query.last : "10",
+            10
+          ) || 10;
+        const events = this.recentEvents.slice(-Math.max(0, last));
+        return sendJson(res, 200, { success: true, data: events });
+      }
+
+      // GET /todos
+      if (method === "GET" && pathname === "/todos") {
+        let results = [...this.todos];
+        const filters = {};
+        if (parsed.query && "completed" in parsed.query) {
+          const q = String(parsed.query.completed).toLowerCase();
+          if (q === "true" || q === "false") {
+            const f = q === "true";
+            results = results.filter((t) => Boolean(t.completed) === f);
+            filters.completed = f;
+          } else {
+            // invalid filter -> 400
+            this.emit("validationError", {
+              errors: ["Invalid completed query parameter"],
+              data: parsed.query,
+              requestInfo,
+              timestamp: nowISO(),
+            });
+            return sendJson(res, 400, {
+              success: false,
+              error: "Invalid completed query parameter",
+            });
+          }
+        }
+        // emit event
+        this.emit("todosListed", {
+          todos: results,
+          count: results.length,
+          filters,
+          timestamp: nowISO(),
+          requestInfo,
+        });
+        return sendJson(res, 200, {
+          success: true,
+          data: results,
+          count: results.length,
+        });
+      }
+
+      // GET /todos/:id
+      const id = parseIdFromPath(pathname);
+      if (method === "GET" && id != null) {
+        const todo = this.todos.find((t) => t.id === id);
+        if (!todo) {
+          this.emit("todoNotFound", {
+            todoId: id,
+            operation: "get",
+            timestamp: nowISO(),
+            requestInfo,
+          });
+          return sendJson(res, 404, {
+            success: false,
+            error: "Todo not found",
+          });
+        }
+        this.emit("todoViewed", { todo, timestamp: nowISO(), requestInfo });
+        return sendJson(res, 200, { success: true, data: todo });
+      }
+
+      // POST /todos
+      if (method === "POST" && pathname === "/todos") {
+        let body;
+        try {
+          body = await parseBody(req);
+        } catch (e) {
+          this.emit("validationError", {
+            errors: ["Invalid JSON"],
+            data: null,
+            requestInfo,
+            timestamp: nowISO(),
+          });
+          return sendJson(res, 400, { success: false, error: "Invalid JSON" });
+        }
+
+        const { errors, values } = validateTodoPayload(body, true);
+        if (errors.length) {
+          this.emit("validationError", {
+            errors,
+            data: body,
+            requestInfo,
+            timestamp: nowISO(),
+          });
+          return sendJson(res, 400, {
+            success: false,
+            error: errors.join("; "),
+          });
+        }
+
+        const now = nowISO();
+        const newTodo = {
+          id: this.nextId++,
+          title: values.title,
+          description: values.description || "",
+          completed: values.completed || false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        this.todos.push(newTodo);
+        this.emit("todoCreated", {
+          todo: newTodo,
+          timestamp: now,
+          requestInfo,
+        });
+        return sendJson(res, 201, { success: true, data: newTodo });
+      }
+
+      // PUT /todos/:id
+      if (method === "PUT" && id != null) {
+        const idx = this.todos.findIndex((t) => t.id === id);
+        if (idx === -1) {
+          this.emit("todoNotFound", {
+            todoId: id,
+            operation: "update",
+            timestamp: nowISO(),
+            requestInfo,
+          });
+          return sendJson(res, 404, {
+            success: false,
+            error: "Todo not found",
+          });
+        }
+
+        let body;
+        try {
+          body = await parseBody(req);
+        } catch (e) {
+          this.emit("validationError", {
+            errors: ["Invalid JSON"],
+            data: null,
+            requestInfo,
+            timestamp: nowISO(),
+          });
+          return sendJson(res, 400, { success: false, error: "Invalid JSON" });
+        }
+
+        const { errors, values } = validateTodoPayload(body, false);
+        if (errors.length) {
+          this.emit("validationError", {
+            errors,
+            data: body,
+            requestInfo,
+            timestamp: nowISO(),
+          });
+          return sendJson(res, 400, {
+            success: false,
+            error: errors.join("; "),
+          });
+        }
+
+        const oldTodo = { ...this.todos[idx] };
+        if ("title" in values) oldTodo.title = oldTodo.title; // noop; we already have old snapshot
+        // apply changes
+        if ("title" in body && body.title != null)
+          this.todos[idx].title = String(body.title).trim();
+        if ("description" in body)
+          this.todos[idx].description =
+            body.description == null ? "" : String(body.description);
+        if ("completed" in body)
+          this.todos[idx].completed = Boolean(body.completed);
+        this.todos[idx].updatedAt = nowISO();
+
+        const newTodo = { ...this.todos[idx] };
+        // compute changed fields
+        const changes = [];
+        ["title", "description", "completed"].forEach((k) => {
+          if (String(oldTodo[k]) !== String(newTodo[k])) changes.push(k);
+        });
+
+        this.emit("todoUpdated", {
+          oldTodo,
+          newTodo,
+          changes,
+          timestamp: nowISO(),
+          requestInfo,
+        });
+        return sendJson(res, 200, { success: true, data: newTodo });
+      }
+
+      // DELETE /todos/:id
+      if (method === "DELETE" && id != null) {
+        const idx = this.todos.findIndex((t) => t.id === id);
+        if (idx === -1) {
+          this.emit("todoNotFound", {
+            todoId: id,
+            operation: "delete",
+            timestamp: nowISO(),
+            requestInfo,
+          });
+          return sendJson(res, 404, {
+            success: false,
+            error: "Todo not found",
+          });
+        }
+        const removed = this.todos.splice(idx, 1)[0];
+        this.emit("todoDeleted", {
+          todo: removed,
+          timestamp: nowISO(),
+          requestInfo,
+        });
+        return sendJson(res, 200, {
+          success: true,
+          message: "Todo deleted successfully",
+        });
+      }
+
+      // unknown route
+      return sendJson(res, 404, { success: false, error: "Not Found" });
+    } catch (err) {
+      // unexpected server error
+      this.emit("serverError", {
+        error: err,
+        operation: "_handleRequest",
+        requestInfo,
+        timestamp: nowISO(),
+      });
+      return sendJson(res, 500, {
+        success: false,
+        error: "Internal server error",
+      });
+    }
   }
 }
 
 module.exports = { TodoServer };
+
