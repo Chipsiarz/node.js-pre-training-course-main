@@ -1,0 +1,58 @@
+STEP 1: Database Connection
+- Opened pgAdmin 4.
+- Connected to the previously created PostgreSQL database "todo_app"
+- Opened the Query Tool to execute raw SQL statements.
+
+STEP 2: Preparation – Insert a User (Required for Foreign Key)
+Before inserting any todo, we must have a valid user in the users table,
+because the todos.user_id column references users.id.
+
+- Insert a user that will own todos
+INSERT INTO users (username, email, password_hash)
+VALUES ('john_doe', 'john@example.com', 'hashed_password_123')
+
+This successfully creates a new user with id = 2
+
+STEP 3: CREATE – Insert a New Todo
+- Create a new todo for user with ID = 1
+INSERT INTO todos (title, description, status, user_id)
+VALUES ('Learn SQL CRUD', 'Practice basic SQL operations', 'active', 2)
+
+This successfully creates a new todo with id = 6, because the user with id = 2 exists
+
+STEP 4: READ – Select All Todos
+- Retrieve all todos
+SELECT * FROM todos
+
+Displays all records from the todos table with columns:
+id, title, description, status, created_at, user_id.
+
+STEP 5: UPDATE – Modify a Todo’s Status
+- Update the status of a todo by ID
+UPDATE todos
+SET status = 'completed'
+WHERE id = 6;
+
+This marks the first todo as completed.
+
+STEP 6: DELETE – Remove a Todo
+- Delete a todo by ID
+DELETE FROM todos
+WHERE id = 6;
+
+STEP 7: Verification Queries
+- Check all todos after deletion
+SELECT * FROM todos;
+
+- Check all users
+SELECT * FROM users;
+
+STEP 8: Summary
+
+- Practiced all four CRUD operations (Create, Read, Update, Delete) using raw SQL.
+
+- Verified that foreign key relationships work correctly.
+
+- Encountered and resolved the foreign key error by inserting a user first.
+
+- Confirmed that data integrity between users and todos is maintained
