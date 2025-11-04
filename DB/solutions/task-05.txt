@@ -1,0 +1,55 @@
+STEP 1: Database Connection
+- Opened pgAdmin 4.
+- Connected to the previously created PostgreSQL database "todo_app"
+- Opened the Query Tool to execute raw SQL statements.
+
+
+STEP 2: Counting Todos by Status
+I wrote a query to count how many todos exist for each status (active, completed, etc.):
+
+- Count todos grouped by status:
+SELECT status, COUNT(*) AS count
+FROM todos
+GROUP BY status
+ORDER BY count DESC;
+
+This query groups all todos by their status and counts how many todos fall into each category
+
+
+STEP 3: Counting Todos per User
+I wrote a query to show how many todos belong to each user.
+The result includes the user's name, email, and the total number of todos.
+
+- Count todos per user (including users with zero todos)
+SELECT u.id AS user_id,
+       u.username AS user_name,
+       u.email,
+       COUNT(t.id) AS todo_count
+FROM users u
+LEFT JOIN todos t ON t.user_id = u.id
+GROUP BY u.id, u.username, u.email
+ORDER BY todo_count DESC;
+
+
+The LEFT JOIN ensures that users without any todos still appear in the results (with a count of 0).
+
+Sorting by todo_count DESC lists the most active users first.
+
+
+STEP 4: Finding Users Without Any Todos
+I wrote two different queries to identify users who have no todos assigned.
+
+SELECT u.id, u.username, u.email, u.created_at
+FROM users u
+LEFT JOIN todos t ON t.user_id = u.id
+WHERE t.id IS NULL;
+
+Both queries return all users that do not have any associated rows in the todos table.
+
+
+STEP 5: Summary
+- All aggregation and grouping queries executed successfully.
+I confirmed that:
+- The database structure (users ↔ todos) works correctly.
+- Grouping and filtering queries return accurate results.
+- Users without todos can be detected properly.

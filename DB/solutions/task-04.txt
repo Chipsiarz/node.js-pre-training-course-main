@@ -29,8 +29,7 @@ VALUES
 ('Finish SQL task', 'Complete task 04 in course', 'active', 3),
 ('Prepare meeting notes', 'Notes for Monday meeting', 'completed', 4);
 
-
-✅ This verifies that the foreign key works — both todos are tied to existing users.
+This verifies that the foreign key works — both todos are tied to existing users.
 
 STEP 5: Verify the Relationship
 - View all todos with user info
@@ -38,8 +37,7 @@ SELECT t.id, t.title, t.status, u.name AS user_name, u.email
 FROM todos t
 JOIN users u ON t.user_id = u.id;
 
-
-✅ This confirms that todos are correctly linked to users.
+This confirms that todos are correctly linked to users.
 
 STEP 6: Summary
 - Established a foreign key relationship (todos.user_id → users.id).
