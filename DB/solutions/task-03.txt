@@ -1,0 +1,58 @@
+STEP 1: Database Connection
+- Opened pgAdmin 4
+- Connected to the database todo_app created in Task 1
+- Opened the Query Tool
+
+STEP 2: Insert Example Data (optional, for testing)
+- Insert sample todos to test filtering and sorting
+
+INSERT INTO todos (title, description, status, user_id)
+VALUES
+('Buy groceries', 'Get milk and eggs', 'active', 2),
+('Finish project', 'Complete SQL assignment', 'completed', 2),
+('Call John', 'Discuss meeting plans', 'active', 2),
+('Team meeting', 'Prepare agenda for team meeting', 'completed', 2),
+('Clean the house', 'Vacuum and dust living room', 'active', 2);
+
+STEP 3: Filter by Status
+- Select only active todos
+SELECT * FROM todos
+WHERE status = 'active';
+
+- Select only completed todos
+SELECT * FROM todos
+WHERE status = 'completed';
+
+
+These queries filter todos by their status value.
+
+STEP 4: Sort by Creation Date
+- Sort todos by oldest first (ascending order)
+SELECT * FROM todos
+ORDER BY created_at ASC;
+
+- Sort todos by newest first (descending order)
+SELECT * FROM todos
+ORDER BY created_at DESC;
+
+These queries show todos ordered by when they were created.
+
+STEP 5: Search by Keyword
+- Search for todos containing the word 'meeting' in title or description
+SELECT * FROM todos
+WHERE title ILIKE '%meeting%'
+OR description ILIKE '%meeting%';
+
+
+The ILIKE operator makes the search case-insensitive (works in PostgreSQL).
+
+STEP 6: Verification Queries
+- View all todos to confirm data
+SELECT * FROM todos;
+
+STEP 7: Summary
+- Practiced filtering using WHERE.
+- Practiced sorting with ORDER BY.
+- Practiced searching using ILIKE and wildcards (%).
+- Verified queries returned correct results.
+- No major issues encountered.
