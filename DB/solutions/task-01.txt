@@ -1,0 +1,34 @@
+STEP 1: Database Installation
+- I installed PostgreSQL using the official installer:
+- https://www.postgresql.org/download/
+- During installation, I set up a password for the postgres user.
+
+STEP 2: GUI Tool Installation
+- I installed pgAdmin 4 for graphical management of the database:
+
+STEP 3: Database Creation
+In pgAdmin:
+- 1. Connected to the PostgreSQL server.
+- 2. Right-clicked on "Databases" → "Create" → "Database..."
+- 3. Set the database name to: todo_app
+- 4. Saved and verified that the database appeared in the list.
+
+STEP 4: Table Creation
+Below is the full SQL script I used to create the "users" and "todos" tables.
+
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  email VARCHAR(255) NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE todos (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  status VARCHAR(50) DEFAULT 'active',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
+);
