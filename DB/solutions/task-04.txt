@@ -1,0 +1,47 @@
+STEP 1: Database Connection
+- Opened pgAdmin 4.
+- Connected to the previously created PostgreSQL database "todo_app"
+- Opened the Query Tool to execute raw SQL statements.
+
+STEP 2: Create the users Table 
+- I already have table from previous tasks
+
+STEP 3: Alter the todos Table
+
+ALTER TABLE todos
+ADD CONSTRAINT fk_todos_user
+FOREIGN KEY (user_id) REFERENCES users(id)
+ON DELETE CASCADE;
+
+This links each todo to a specific user via a foreign key.
+The ON DELETE CASCADE rule ensures that when a user is deleted, all their todos are deleted automatically.
+
+STEP 4: Insert Example Data
+- Insert sample users
+INSERT INTO users (name, email, password_hash)
+VALUES
+('Alice Johnson', 'alice@example.com', 'hashed_password'),
+('Bob Smith', 'bob@example.com', 'hashed_password');
+
+- Insert todos linked to these users
+INSERT INTO todos (title, description, status, user_id)
+VALUES
+('Finish SQL task', 'Complete task 04 in course', 'active', 3),
+('Prepare meeting notes', 'Notes for Monday meeting', 'completed', 4);
+
+
+✅ This verifies that the foreign key works — both todos are tied to existing users.
+
+STEP 5: Verify the Relationship
+- View all todos with user info
+SELECT t.id, t.title, t.status, u.name AS user_name, u.email
+FROM todos t
+JOIN users u ON t.user_id = u.id;
+
+
+✅ This confirms that todos are correctly linked to users.
+
+STEP 6: Summary
+- Established a foreign key relationship (todos.user_id → users.id).
+- Verified that inserting todos with valid users works.
+- No errors encountered.
