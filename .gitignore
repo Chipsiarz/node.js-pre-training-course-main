@@ -32,3 +32,4 @@ yarn-error.log*
 
 # Ignore local env files
 .env.* 
+/generated/prisma

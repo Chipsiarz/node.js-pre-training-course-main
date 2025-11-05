@@ -1,0 +1,23 @@
+STEP 1: ORM Installation
+- Installed Prisma ORM in the Node.js project:
+  npm install prisma --save-dev
+  npm install @prisma/client
+  npx prisma init
+
+STEP 2: Database Configuration
+- Configured Prisma to connect to my PostgreSQL database (todo_app) using DATABASE_URL in .env.
+
+STEP 3: Model Definitions
+- Defined User and Todo models with a one-to-many relationship.
+
+STEP 4: Migration
+- Ran migration with: npx prisma migrate dev --name init
+
+STEP 5: Seeding
+- Added seed script (prisma/seed.js) and populated the database with two users and three todos for each.
+
+STEP 6: Verification
+- Verified tables and data using Prisma Studio: npx prisma studio
+
+Issues Encountered:
+- None. The ORM connected successfully and created the tables as expected.
