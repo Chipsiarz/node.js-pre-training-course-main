@@ -1,0 +1,37 @@
+STEP 1: Database Connection
+- Opened pgAdmin 4.
+- Connected to the previously created PostgreSQL database "todo_app"
+- Opened the Query Tool to execute raw SQL statements.
+
+
+STEP 2: Creating an Index on the status Column
+Indexes improve query performance by allowing the database to quickly locate rows based on indexed columns.
+I created an index on the status column of the todos table as follows:
+
+- Create an index to optimize queries filtering by status
+CREATE INDEX idx_todos_status ON todos(status);
+
+After executing this command, the database will maintain a separate index structure for the status column, which accelerates queries like:
+SELECT * FROM todos WHERE status = 'active';
+
+
+STEP 3: Analyzing Query Performance
+Before and after creating the index, I used the EXPLAIN and EXPLAIN ANALYZE commands to analyze how PostgreSQL executes the query.
+
+- Analyze how PostgreSQL executes the query:
+EXPLAIN ANALYZE
+SELECT * FROM todos WHERE status = 'active';
+
+
+STEP 4: Verification
+
+I ran both EXPLAIN ANALYZE queries before and after creating the index and observed the performance difference.
+After adding the index, the query cost and execution time were significantly reduced.
+
+
+STEP 5: Issues Encountered
+Initially, I forgot to use ANALYZE after creating the index. Running:
+ANALYZE todos;
+
+helped PostgreSQL update its internal statistics for better optimization.
+No major errors occurred during index creation.
