@@ -1,0 +1,28 @@
+STEP 1: prisma-scripts/createUser.js
+   - Creates a user to satisfy foreign-key constraints.
+   - Usage:
+     node prisma-scripts/createUser.js
+
+
+STEP 2: prisma-scripts/createTodo.js
+   - Creates a todo and connects it to an existing user (user id must exist).
+   - Usage:
+     node prisma-scripts/createTodo.js
+
+
+STEP 3: prisma-scripts/listTodos.js
+   - Lists todos (includes user relation).
+   - Usage:
+     node prisma-scripts/listTodos.j
+
+
+STEP 4: prisma-scripts/updateTodo.js
+   - Updates a todo by id (pass id as CLI arg).
+   - Usage:
+     node prisma-scripts/updateTodo.js <id>
+
+
+STEP 5: prisma-scripts/deleteTodo.js
+   - Deletes a todo by id (pass id as CLI arg).
+   - Usage:
+     node prisma-scripts/deleteTodo.js <id>
