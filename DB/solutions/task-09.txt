@@ -1,0 +1,57 @@
+STEP 1: Create the audit_log table
+
+CREATE TABLE audit_log (
+  id SERIAL PRIMARY KEY,
+  todo_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+STEP 2: Create trigger function for UPDATE operations
+
+CREATE OR REPLACE FUNCTION log_todo_update()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO audit_log (todo_id, action, changed_at)
+  VALUES (NEW.id, 'UPDATE', CURRENT_TIMESTAMP);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+STEP 3: Attach UPDATE trigger to todos table
+
+CREATE TRIGGER after_todo_update
+AFTER UPDATE ON todos
+FOR EACH ROW
+EXECUTE FUNCTION log_todo_update();
+
+
+STEP 4: Create trigger function for DELETE operations
+
+CREATE OR REPLACE FUNCTION log_todo_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO audit_log (todo_id, action, changed_at)
+  VALUES (OLD.id, 'DELETE', CURRENT_TIMESTAMP);
+  RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+
+STEP 5: Attach DELETE trigger to todos table
+
+CREATE TRIGGER after_todo_delete
+AFTER DELETE ON todos
+FOR EACH ROW
+EXECUTE FUNCTION log_todo_delete();
+
+
+STEP 6: Test the triggers (example statements you can run in pgAdmin)
+
+UPDATE todos SET status = 'completed' WHERE id = 1;
+
+DELETE FROM todos WHERE id = 2;
+
+SELECT * FROM audit_log;
