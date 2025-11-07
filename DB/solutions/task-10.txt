@@ -1,0 +1,67 @@
+STEP 1: Redis Installation
+Installed Redis using Docker (local container):
+
+docker run -p 6379:6379 --name redis -d redis:latest
+
+
+STEP 2: Redis Client Installation
+Installed the Node.js Redis client in the project:
+
+npm install ioredis
+
+
+STEP 3: Server Implementation
+Created a new server file server.js (separate from task-04 and task-05 files) that implements the following caching logic:
+
+On GET /todos?userId={id} the server:
+Checks Redis key todos:user:{userId} for cached JSON.
+If present → returns cached data and sets fromCache: true.
+If missing → queries the database (or in-memory store), serializes and stores result in Redis under todos:user:{userId} with TTL (time-to-live) = 300 seconds (5 minutes), then returns the data with fromCache: false.
+
+On POST /todos, PUT /todos/:id, DELETE /todos/:id:
+After modifying todos for a user, the server invalidates the cache by deleting the Redis key todos:user:{userId} so subsequent reads fetch fresh data.
+Added a helper endpoint for debugging: GET /cache/user/:id which returns whether key todos:user:{id} is present and its value.
+
+
+STEP 4: Cache key and TTL
+Cache key format used: todos:user:{userId}
+TTL used for cached entries: 300 seconds (5 minutes)
+
+
+STEP 5: Example commands used to test and verify functionality
+Start Redis (example):
+docker run -p 6379:6379 --name redis -d redis:latest
+
+Start the server:
+node server.js
+
+Manual tests performed with curl (actual outputs captured during testing):
+List users:
+
+curl http://localhost:3000/users
+# {"success":true,"data":[{"id":1,"username":"alice","email":"alice@example.com"},{"id":2,"username":"bob","email":"bob@example.com"}]}
+
+curl "http://localhost:3000/todos?userId=1"
+# {"success":true,"data":[{...}],"fromCache":false,"count":1}
+
+Second request for user 1 todos (cache hit):
+curl "http://localhost:3000/todos?userId=1"
+# {"success":true,"data":[{...}],"fromCache":true,"count":1}
+
+Inspect Redis key for user 1:
+curl http://localhost:3000/cache/user/1
+# {"success":true,"key":"todos:user:1","present":true,"value":[{...}]}
+
+Create a new todo for user 1 (this invalidates the cache for user 1):
+curl -X POST http://localhost:3000/todos -H "Content-Type: application/json" -d '{"title":"Demo todo","user_id":1,"description":"demo","status":"active"}'
+# {"success":true,"data":{ "id":3, "title":"Demo todo", ... }}
+
+After create — request again (cache miss and refreshed list containing the new todo):
+curl "http://localhost:3000/todos?userId=1"
+# {"success":true,"data":[ {...}, {...} ],"fromCache":false,"count":2}
+
+
+STEP 6: Files / Commands recorded
+New server file: server.js (contains caching logic and endpoints)
+Redis started with Docker:
+docker run -p 6379:6379 --name redis -d redis:latest
