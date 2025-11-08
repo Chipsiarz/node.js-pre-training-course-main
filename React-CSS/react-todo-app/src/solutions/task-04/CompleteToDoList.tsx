@@ -38,7 +38,7 @@ export const CompleteToDoList: React.FC = () => {
         <button onClick={addTodo}>Add</button>
       </div>
 
-      <ul>
+      <ul style={{ listStyleType: "none", marginTop: "1rem" }}>
         {todos.length === 0 && <p>No todos yet.</p>}
         {todos.map((todo) => (
           <li key={todo.id}>
