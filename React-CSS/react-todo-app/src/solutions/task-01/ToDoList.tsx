@@ -1,9 +1,6 @@
 import React from "react";
 import { TodoListProps } from "../../types";
 
-/**
- * Task 1: ToDoList Component
- */
 export const ToDoList: React.FC<TodoListProps> = ({ todos }) => {
   if (!todos || todos.length === 0) {
     return <p>No todos available.</p>;
