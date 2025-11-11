@@ -1,0 +1,34 @@
+1. Git commands used:
+   git checkout -b feature/update-readme-v1
+   git add README.md
+   git commit -m "chore(Git-Docker): Update readme title to v1"
+   git checkout master
+   git checkout -b feature/update-readme-v2
+   git add README.md
+   git commit -m "chore(Git-Docker): Update readme title to v2"
+   git checkout master
+   git merge feature/update-readme-v1
+   git merge feature/update-readme-v2
+
+# (conflict occurs)
+
+# manually edit README.md
+
+git add README.md
+git commit -m "chore(Git-Docker): Merge feature/update-readme-v2 — resolved title conflict by combining both versions"
+
+2. Conflict markers seen:
+   // <<<<<<< HEAD
+   // My Awesome Project v1
+   // =======
+   // My Super Project v2
+   // >>>>>>> feature/update-readme-v2
+
+3. Conflict resolution:
+   Final README.md after resolution:
+
+"My Awesome and Super Project"
+
+4. Final commit message:
+   "chore(Git-Docker): Merge feature/update-readme-v2 — resolved title conflict by combining both versions"
+
