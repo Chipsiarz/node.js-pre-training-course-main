@@ -1,0 +1,40 @@
+1. Dockerfile content:
+
+FROM node:24-alpine
+WORKDIR /app
+COPY package\*.json ./
+RUN npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "start"]
+
+2. Docker commands used:
+
+# Build Docker image
+
+docker build -t my-node-app:v1 .
+
+# Run container in detached mode and map port 3000
+
+docker run -d -p 3000:3000 my-node-app:v1
+
+# List running containers
+
+docker ps
+
+# See output
+
+curl http://localhost:3000
+
+# Check logs
+
+docker logs <container_id>
+
+# Stop the container
+
+docker stop <container_id>
+
+# Remove the container
+
+docker rm <container_id>
+
