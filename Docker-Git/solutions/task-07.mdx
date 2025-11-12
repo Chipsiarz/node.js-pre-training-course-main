@@ -1,0 +1,58 @@
+# Docker Compose Commands Used
+
+docker-compose up -d
+docker-compose ps
+docker-compose logs api
+docker-compose down
+
+# Docker Compose File
+
+version: "3.9"
+
+services:
+api:
+build: .
+ports: - "3000:3000"
+depends_on: - db
+environment: - DB_HOST=db - DB_USER=postgres - DB_PASSWORD=postgres - DB_NAME=mydb
+
+db:
+image: postgres:16
+environment:
+POSTGRES_USER: postgres
+POSTGRES_PASSWORD: postgres
+POSTGRES_DB: mydb
+volumes: - pgdata:/var/lib/postgresql/data
+ports: - "5432:5432"
+
+pgadmin:
+image: dpage/pgadmin4
+environment:
+PGADMIN_DEFAULT_EMAIL: admin@example.com
+PGADMIN_DEFAULT_PASSWORD: admin
+ports: - "8080:80"
+depends_on: - db
+
+volumes:
+pgdata:
+
+# Service URLs and Credentials
+
+Node.js API: http://localhost:3000
+pgAdmin: http://localhost:8080
+
+- Email: admin@example.com
+- Password: admin
+  PostgreSQL:
+- Host: db
+- Port: 5432
+- User: postgres
+- Password: postgres
+- Database: mydb
+
+# docker-compose ps output
+
+my-first-repo-api-1 my-first-repo-api "docker-entrypoint.s…" api 3 minutes ago Up 3 minutes 0.0.0.0:3000->3000/tcp
+my-first-repo-db-1 postgres:16 "docker-entrypoint.s…" db 13 minutes ago Up 3 minutes 0.0.0.0:5432->5432/tcp
+my-first-repo-pgadmin-1 dpage/pgadmin4 "/entrypoint.sh" pgadmin 13 minutes ago Up 3 minutes 443/tcp, 0.0.0.0:8080->80/tcp
+
