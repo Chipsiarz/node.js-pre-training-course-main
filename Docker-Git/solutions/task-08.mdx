@@ -1,0 +1,122 @@
+# Task 08: Simulating Team Git Workflow with Multiple Remotes
+
+## Remote configuration (`git remote -v`)
+
+# 'fork' simulates remote repository (origin).
+
+# 'main' simulates the company's central repository (upstream).
+
+fork ../task-08-remotes/fork.git (fetch)
+fork ../task-08-remotes/fork.git (push)
+main ../task-08-remotes/main.git (fetch)
+main ../task-08-remotes/main.git (push)
+
+---
+
+## Feature branch workflow commands
+
+### Phase 1: Configuration and Initial Push
+
+# Folder preparation (executed in the parent directory)
+
+mkdir task-08-remotes
+cd task-08-remotes
+git init --bare main.git
+git init --bare fork.git
+
+# Adding remotes to my-first-repo (my local working directory)
+
+git remote add main ../task-08-remotes/main.git
+git remote add fork ../task-08-remotes/fork.git
+
+# Initial push of the 'master' branch (my local main branch) to remote repositories
+
+git push fork master
+git push main master
+
+### Phase 2: Feature Implementation
+
+# Create and switch to the feature branch
+
+git checkout -b feature/docker-compose-config
+
+# Commit 1: Adding a file
+
+echo "version: '3.8'" > temp_file.txt
+git add temp_file.txt
+git commit -m "feat: Add base Docker Compose structure"
+
+# Commit 2: Refactoring
+
+echo "Added new service 'web'" >> temp_file.txt
+git add temp_file.txt
+git commit -m "refactor: Isolate web service configuration"
+
+# Push the feature branch to FORK (Preparing for PR)
+
+git push fork feature/docker-compose-config
+
+### Phase 3: Pull Request Acceptance Simulation (Merge)
+
+# Changes are merged in the local work tree, and then pushed to the company's repository ('main')
+
+git fetch fork
+git checkout master
+git merge fork/feature/docker-compose-config -m "Merge pull request #1 from kamil/feature/docker-compose-config"
+git push main master
+
+---
+
+## Strategy for handling upstream changes
+
+### Phase 3: Handling Feedback and Safe Force Push
+
+# Additional commits in response to "review comments"
+
+git checkout feature/docker-compose-config
+echo "# This is a review fix" >> temp_file.txt
+git add temp_file.txt
+git commit -m "fix(review): Address feedback on service naming"
+
+# Push changes to the fork with SAFE FORCING
+
+# Using --force-with-lease prevents accidental overwriting of others' work.
+
+git push fork feature/docker-compose-config --force-with-lease
+
+### Phase 3: Synchronizing Fork with Upstream ('main')
+
+# The strategy involves fetching changes from the company's main repository ('main'),
+
+# merging them into the local 'master' branch, and then pushing the update to the 'fork'.
+
+# 1. Fetch new changes from the company's repository (main/master)
+
+git fetch main
+
+# 2. Switch to the local main branch (master)
+
+git checkout master
+
+# 3. Merge new changes from the company's repository (main/master) into local master
+
+git merge main/master
+
+# 4. Push the updated master branch to fork (fork/master)
+
+git push fork master
+
+---
+
+## Best practices for commit messages you learned
+
+- **Conciseness and Specificity Principle:** The commit title (first line) should be brief (ideally up to 50 characters) and immediately explain what changed.
+- **Imperative Mood:** The commit subject should be written in the imperative mood, e.g., "**Add** new feature" instead of "Adding new feature."
+- **Conventional Commits Pattern:** Using prefixes (types) helps categorize changes and automate tools (e.g., changelog generation).
+  - **feat:** Introduction of a new feature.
+  - **fix:** Bug fix.
+  - **refactor:** Code change without changing external functionality.
+  - **docs:** Documentation-only changes.
+  - **chore:** Routine tasks, build/tool configuration (e.g., dependency update).
+- **Body:** Using an empty line to separate the title from a more detailed description (the body) is crucial when an explanation of **why** the change was made is needed.
+
