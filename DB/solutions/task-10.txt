@@ -28,8 +28,8 @@ Cache key format used: todos:user:{userId}
 TTL used for cached entries: 300 seconds (5 minutes)
 
 
-STEP 5: Example commands used to test and verify functionality
-Start Redis (example):
+STEP 5: Commands used to test and verify functionality
+Start Redis:
 docker run -p 6379:6379 --name redis -d redis:latest
 
 Start the server:

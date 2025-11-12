@@ -48,7 +48,7 @@ FOR EACH ROW
 EXECUTE FUNCTION log_todo_delete();
 
 
-STEP 6: Test the triggers (example statements you can run in pgAdmin)
+STEP 6: Test the triggers
 
 UPDATE todos SET status = 'completed' WHERE id = 1;
 
