@@ -1,0 +1,117 @@
+## 1. Image Management
+
+# Purpose: Manage Docker images (pull, inspect, tag, save/load, remove)
+
+docker pull nginx:alpine # Pull nginx image
+docker pull redis:7-alpine # Pull redis image
+docker pull node:24-alpine # Pull Node.js image
+docker images # List all images
+docker inspect nginx:alpine # Inspect nginx image details
+docker tag nginx:alpine my-nginx:latest # Tag image with custom name
+docker save -o nginx-alpine.tar nginx:alpine # Save image to tar file
+docker load -i nginx-alpine.tar # Load image from tar
+docker rmi my-nginx:latest # Remove tagged image
+docker system prune -f # Cleanup unused images
+
+## 2. Container Lifecycle
+
+# Purpose: Run, manage, and interact with containers
+
+docker run -d -p 8080:80 nginx:alpine # Run nginx container in detached mode
+docker run -d --name my-redis --restart always redis:7-alpine # Run redis with restart policy
+docker create --name my-node node:24-alpine # Create node container without starting
+docker start my-node # Start the node container
+docker exec -it my-node sh # Enter shell in node container
+docker exec -it my-redis redis-cli # Open Redis CLI inside container
+docker cp ./localfile.txt my-node:/app/ # Copy file from host to container
+docker cp my-node:/app/file.txt ./hostfile.txt # Copy file from container to host
+
+## 3. Monitoring and Troubleshooting
+
+# Purpose: Observe containers and inspect details
+
+docker stats # Monitor container resources
+docker logs -f --timestamps nginx # Follow logs with timestamps
+docker inspect my-node # Inspect container configuration
+docker volume create my-volume # Create Docker volume
+docker run -v my-volume:/data redis # Attach volume to container
+
+## 4. Cleanup and Maintenance
+
+# Purpose: Stop containers, remove resources, clean system
+
+docker stop $(docker ps -q) # Stop all running containers
+docker rm $(docker ps -a -q) # Remove all containers
+docker rmi $(docker images -q) # Remove all images
+docker volume rm $(docker volume ls -q) # Remove all volumes
+docker network prune -f # Remove unused networks
+
+## 5. Docker System Disk Usage
+
+# Purpose: Check disk usage before and after cleanup
+
+# BEFORE CLEANUP
+
+TYPE TOTAL ACTIVE SIZE RECLAIMABLE
+Images 19 4 5.625GB 5.263GB (93%)
+Containers 5 3 106.5kB 8.192kB (7%)
+Local Volumes 10 2 293.9MB 293.9MB (99%)
+Build Cache 35 0 22.76MB 22.76MB
+
+# AFTER CLEANUP
+
+TYPE TOTAL ACTIVE SIZE RECLAIMABLE
+Images 0 0 911MB 911MB (100%)
+Containers 0 0 0B 0B
+Local Volumes 0 0 0B 0B
+Build Cache 35 0 1.187GB 1.187GB
+
+## 6. Example of Container Inspection
+
+## 6. Example of Container Inspection
+
+docker inspect my-nginx
+[
+{
+"Id": "760d79d79a91d41acf66a0b13e214b6d663ecb9f95edbeeb63a6270f3dd12f88",
+"Name": "/my-nginx",
+"Image": "nginx:alpine",
+"State": {
+"Status": "created",
+"Running": false,
+"ExitCode": 128
+},
+"HostConfig": {
+"PortBindings": {
+"80/tcp": [
+{ "HostPort": "8080" }
+]
+}
+}
+}
+]
+
+## 7. Example of Container Logs
+
+docker logs festive_hypatia
+/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+/docker-entrypoint.sh: Configuration complete; ready for start up
+2025/11/12 18:01:18 [notice] 1#1: start worker processes
+172.17.0.1 - - [12/Nov/2025:18:20:13 +0000] "GET / HTTP/1.1" 200 615 "-" "curl/8.14.1" "-"
+172.17.0.1 - - [12/Nov/2025:18:20:35 +0000] "GET / HTTP/1.1" 200 615 "-" "curl/8.14.1" "-"
+
+## 8. Most Useful Docker Commands
+
+# List of most helpful commands during this task:
+
+# - docker stats
+
+# - docker logs -f --timestamps
+
+# - docker exec -it <container> sh
+
+# - docker cp
+
+# - docker system prune -f
+
