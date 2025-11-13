@@ -1,0 +1,105 @@
+## 1. Network Creation
+
+docker network create app-network
+docker network create --subnet=172.25.0.0/16 app-subnet
+docker network ls
+docker network inspect app-network
+
+## 2. Multi-container Communication
+
+docker volume create mongo-data
+docker run -d --name mongo --network app-network -v mongo-data:/data/db mongo:6
+docker run -d --name mongo-express --network app-network -e ME_CONFIG_MONGODB_SERVER=mongo -p 8081:8081 mongo-express:1.0
+docker run -d --name node-app --network app-network my-node-app
+
+# Test container communication
+
+docker exec -it node-app ping mongo
+
+## 3. Volume Types
+
+docker volume ls
+docker run -d --name node-dev -v $(PWD)/src:/app/src --network app-network my-node-app
+docker run -d --name temp-container --tmpfs /tmp:rw,size=100m alpine
+
+# Test data persistence:
+
+# - Named volume persists after restart
+
+# - Bind mount shows live host changes
+
+# - tmpfs disappears after container stop
+
+## 4. Network Isolation
+
+docker network create isolated-net
+docker run -d --name container1 --network isolated-net alpine sleep 1000
+docker run -d --name container2 --network app-network alpine sleep 1000
+docker exec -it container1 ping container2 # fails
+docker network connect app-network container1
+docker exec -it container1 ping container2 # succeeds
+
+## 5. Network Topology (text-based)
+
+All containers are connected to the same custom bridge network:
+
+[app-network]
+├── mongo
+├── mongo-express
+└── node-app
+
+# Output from docker ps --format "table {{.Names}}\t{{.Networks}}"
+
+NAMES NETWORKS
+node-app app-network
+mongo-express app-network
+mongo app-network
+
+## 6. Docker Output Examples
+
+# docker network ls
+
+NETWORK ID NAME DRIVER SCOPE
+1de282c7d2ff app-network bridge local
+cddab6211379 app-subnet bridge local
+4cb18fecb603 bridge bridge local
+a52d78a5d5dc host host local
+61fef7c63f1a none null local
+
+# docker volume ls
+
+DRIVER VOLUME NAME
+local a3d1cb06b35377227dfeb4905d001b8c3eb58be097266daa1ce87a1d729da662
+local mongo-data
+
+## 7. Test Results
+
+# node-app → mongo
+
+PING mongo (172.18.0.2): 56 data bytes
+64 bytes from 172.18.0.2: seq=0 ttl=64 time=0.101 ms
+64 bytes from 172.18.0.2: seq=1 ttl=64 time=0.131 ms
+--- mongo ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+Result: SUCCESS (containers communicate on same network)
+
+# container1 → container2 before connecting to app-network
+
+ping: bad address 'container2'
+Result: FAIL (network isolation confirmed)
+
+# container1 → container2 after connecting to app-network
+
+PING container2 (172.18.0.6): 56 data bytes
+64 bytes from 172.18.0.6: seq=0 ttl=64 time=0.055 ms
+64 bytes from 172.18.0.6: seq=1 ttl=64 time=0.112 ms
+--- container2 ping statistics ---
+2 packets transmitted, 2 packets received, 0% packet loss
+Result: SUCCESS (communication restored after joining app-network)
+
+## 8. Notes
+
+- Named volume: `/data/db` persists data between container restarts
+- Bind mount: `/app/src` syncs live host code during development
+- tmpfs mount: `/tmp` is stored in memory only and removed after container stop
+
