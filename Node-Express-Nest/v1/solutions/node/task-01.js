@@ -41,20 +41,6 @@ class MessageSystem extends EventEmitter {
     }
   }
 
-  /**
-   * Send a message to the system
-   *
-   * Create a message object with id, type, content, timestamp, sender
-   * Add message to messages array
-   * Keep only last 100 messages for memory management
-   * Emit the message event and specific type event
-   *
-   * @param {string} type - Message type ('message', 'notification', 'alert')
-   * @param {string} content - Message content
-   * @param {string} sender - Optional sender name
-   * @returns {object} Created message object
-   */
-
   sendMessage(type, content, sender = "System") {
     const validTypes = ["message", "notification", "alert"];
     if (!validTypes.includes(type)) {
@@ -92,64 +78,21 @@ class MessageSystem extends EventEmitter {
     return message;
   }
 
-  /**
-   * Subscribe to all message types
-   *
-   * Listen to all messages using the 'message' event
-   *
-   * @param {function} callback - Callback function to handle messages
-   */
-
   subscribeToMessages(callback) {
     this.on("message", callback);
   }
-
-  /**
-   * Subscribe to specific message type
-   *
-   *  Listen to specific message type events
-   *
-   * @param {string} type - Message type to subscribe to
-   * @param {function} callback - Callback function to handle messages
-   */
 
   subscribeToType(type, callback) {
     this.on(type, callback);
   }
 
-  /**
-   * Get current number of active users
-   *
-   * Return the number of users
-   *
-   * @returns {number} Number of active users
-   */
-
   getUserCount() {
     return this.users.size;
   }
 
-  /**
-   * Get the last N messages (default 10)
-   *
-   * Return the last 'count' messages
-   *
-   * @param {number} count - Number of messages to retrieve
-   * @returns {array} Array of recent messages
-   */
-
   getMessageHistory(count = 10) {
     return this.messages.slice(-count);
   }
-
-  /**
-   * Add a user to the system
-   *
-   * Add user to users set (avoid duplicates)
-   * Create and emit user-joined event
-   *
-   * @param {string} username - Username to add
-   */
 
   addUser(username, role = "user") {
     if (!username) return;
@@ -166,15 +109,6 @@ class MessageSystem extends EventEmitter {
     }
   }
 
-  /**
-   * Remove a user from the system
-   *
-   * Remove user from users set
-   * Create and emit user-left event
-   *
-   * @param {string} username - Username to remove
-   */
-
   removeUser(username) {
     if (this.users.has(username)) {
       this.users.delete(username);
@@ -189,37 +123,14 @@ class MessageSystem extends EventEmitter {
     }
   }
 
-  /**
-   * Get all active users
-   *
-   * Convert users Set to Array and return
-   *
-   * @returns {array} Array of usernames
-   */
-
   getActiveUsers() {
     return Array.from(this.users.keys());
   }
-
-  /**
-   * Clear all messages
-   *
-   * Clear messages array
-   * Emit history-cleared event
-   */
 
   clearHistory() {
     this.messages = [];
     this.emit("history-cleared", { timestamp: new Date() });
   }
-
-  /**
-   * Get system statistics
-   *
-   * Calculate and return statistics
-   *
-   * @returns {object} System stats
-   */
 
   getStats() {
     const messagesByType = this.messages.reduce((acc, msg) => {
