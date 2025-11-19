@@ -57,7 +57,7 @@ class CSVParser extends Transform {
         this.push(record);
       }
 
-      this.emit("progress", { lines: this.lineNumber });
+      console.log(`Processed lines: ${this.lineNumber}`);
     }
     callback();
   }
@@ -499,8 +499,8 @@ module.exports = {
   createSampleData,
 };
 //
-// Example usage (for testing):
-const isReadyToTest = true;
+// Example usage (for testing): node task-02.js data/users.csv data/users_transformed.csv
+const isReadyToTest = false;
 
 if (isReadyToTest) {
   // Create sample data
