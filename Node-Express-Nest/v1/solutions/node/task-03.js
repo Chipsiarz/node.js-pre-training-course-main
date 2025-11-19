@@ -655,6 +655,25 @@ if (isReadyToTest) {
     console.log("=== Event Loop Demonstration ===");
     await demonstrateEventLoop();
 
+    // Bonus 1 – Event Loop Diagram
+    console.log("\n=== Bonus 1: Event Loop Diagram (ASCII) ===");
+    console.log(generateEventLoopDiagram().ascii);
+
+    console.log("\n=== Bonus 1: Event Loop Diagram (JSON) ===");
+    console.log(generateEventLoopDiagram().json);
+
+    // Bonus 3 – Timeout Test
+    console.log("\n=== Bonus 3: Timeout Test ===");
+    try {
+      await withTimeout(
+        new Promise((resolve) => setTimeout(() => resolve("done"), 1000)), // symulacja długiej operacji
+        50, // bardzo krótki timeout
+        "Test operation"
+      );
+    } catch (err) {
+      console.log("✅ Timeout triggered as expected:", err.message);
+    }
+
     // Analyze execution order
     console.log("\n=== Execution Order Analysis ===");
     const analysis = analyzeEventLoop();
