@@ -49,7 +49,7 @@ export const AddToDo: React.FC = () => {
 
       <div>
         {todos.length === 0 ? (
-          <p style={{ color: "#666" }}>No todos yet. Add your first todo!</p>
+          <p style={{ color: "#666" }}>No todos yet. Create your first todo!</p>
         ) : (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {todos.map((t) => (

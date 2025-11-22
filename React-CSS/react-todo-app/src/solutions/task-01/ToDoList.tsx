@@ -9,10 +9,10 @@ export const ToDoList: React.FC<TodoListProps> = ({ todos }) => {
   return (
     <div>
       <h3>Todo List</h3>
-      <ul>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {todos.map((todo) => (
           <li key={todo.id}>
-            {todo.title} – {todo.completed ? "completed" : "not completed"}
+            {todo.title} - {todo.completed ? "completed" : "not completed"}
           </li>
         ))}
       </ul>

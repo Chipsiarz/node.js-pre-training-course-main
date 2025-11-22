@@ -5,7 +5,8 @@ import "./StyledToDoItem.css";
 export const StyledToDoItem: React.FC<TodoItemProps> = ({ todo }) => {
   return (
     <div className={todo.completed ? "todo-item completed" : "todoItem"}>
-      {todo.title}
+      <span>{todo.title}</span>
+      {todo.completed && <span> (completed)</span>}
     </div>
   );
 };
