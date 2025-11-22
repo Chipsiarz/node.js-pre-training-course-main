@@ -10,31 +10,41 @@ docker-compose down
 version: "3.9"
 
 services:
-api:
-build: .
-ports: - "3000:3000"
-depends_on: - db
-environment: - DB_HOST=db - DB_USER=postgres - DB_PASSWORD=postgres - DB_NAME=mydb
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=mydb
 
-db:
-image: postgres:16
-environment:
-POSTGRES_USER: postgres
-POSTGRES_PASSWORD: postgres
-POSTGRES_DB: mydb
-volumes: - pgdata:/var/lib/postgresql/data
-ports: - "5432:5432"
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mydb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
-pgadmin:
-image: dpage/pgadmin4
-environment:
-PGADMIN_DEFAULT_EMAIL: admin@example.com
-PGADMIN_DEFAULT_PASSWORD: admin
-ports: - "8080:80"
-depends_on: - db
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
 
 volumes:
-pgdata:
+  pgdata:
 
 # Service URLs and Credentials
 

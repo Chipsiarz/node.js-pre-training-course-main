@@ -63,6 +63,9 @@ node-multistage v2 5aa68c5b39e0 7 minutes ago 292MB
 node-multistage v1 47b903cd5c56 7 minutes ago 292MB
 node-single v1 77ddc47701f6 14 minutes ago 332MB
 
+
+Note: Multi-stage build produces smaller and cleaner image by excluding dev dependencies and source files
+
 6. Test result:
 
 Response from app:

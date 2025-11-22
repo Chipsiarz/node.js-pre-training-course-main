@@ -1,11 +1,25 @@
 All used commands:
 
 git init
-git config user.name "Kamil"
-git config user.email "kamil.machnik97@gmail.com"
-git add .gitignore
-git commit -m "Add .gitignore file"
-git add README.md package.json
-git commit -m "Add README and package.json"
-git log --oneline
+# Initializes a new Git repository in the current folder
 
+git config user.name "Kamil"
+# Sets the author name for commits in this repository
+
+git config user.email "kamil.machnik97@gmail.com"
+# Sets the author email for commits
+
+git add .gitignore
+# Stages the .gitignore file for commit
+
+git commit -m "Add .gitignore file"
+# Creates a commit with the staged file and a message
+
+git add README.md package.json
+# Stages README.md and package.json together
+
+git commit -m "Add README and package.json"
+# Commits the staged files
+
+git log --oneline
+# Shows commit history in a compact format

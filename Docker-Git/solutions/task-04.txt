@@ -18,11 +18,12 @@ git add README.md
 git commit -m "chore(Git-Docker): Merge feature/update-readme-v2 — resolved title conflict by combining both versions"
 
 2. Conflict markers seen:
-   // <<<<<<< HEAD
-   // My Awesome Project v1
-   // =======
-   // My Super Project v2
-   // >>>>>>> feature/update-readme-v2
+<<<<<<< HEAD
+My Awesome Project v1
+=======
+My Super Project v2
+>>>>>>> feature/update-readme-v2
+
 
 3. Conflict resolution:
    Final README.md after resolution:

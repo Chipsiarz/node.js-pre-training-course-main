@@ -3,9 +3,9 @@ All used commands:
 git checkout -b feature/add-scripts
 git add package.json
 git commit -m "chore(Git-Docker): Add script section to package.json"
-git checkout main
+git checkout master
 git checkout -b feature/add-dependencies
-git checkout main
+git checkout master
 git merge feature/add-scripts
 git branch -d feature/add-scripts
 git branch -a

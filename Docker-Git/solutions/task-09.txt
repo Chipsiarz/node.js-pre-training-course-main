@@ -2,94 +2,105 @@
 
 # Purpose: Manage Docker images (pull, inspect, tag, save/load, remove)
 
-docker pull nginx:alpine # Pull nginx image
-docker pull redis:7-alpine # Pull redis image
-docker pull node:24-alpine # Pull Node.js image
-docker images # List all images
-docker inspect nginx:alpine # Inspect nginx image details
-docker tag nginx:alpine my-nginx:latest # Tag image with custom name
-docker save -o nginx-alpine.tar nginx:alpine # Save image to tar file
-docker load -i nginx-alpine.tar # Load image from tar
-docker rmi my-nginx:latest # Remove tagged image
-docker system prune -f # Cleanup unused images
+docker pull nginx:alpine                # Pull nginx image
+docker pull redis:7-alpine              # Pull redis image
+docker pull node:24-alpine              # Pull Node.js image
+
+docker images                           # List all images
+docker inspect nginx:alpine             # Inspect nginx image details
+
+docker tag nginx:alpine my-nginx:latest # Tag nginx with custom name
+docker save -o nginx-alpine.tar nginx:alpine   # Save image to tar
+docker load -i nginx-alpine.tar         # Load image from tar
+
+docker rmi my-nginx:latest              # Remove tagged image
+docker system prune -f                  # Remove unused data
+
 
 ## 2. Container Lifecycle
 
 # Purpose: Run, manage, and interact with containers
 
-docker run -d -p 8080:80 nginx:alpine # Run nginx container in detached mode
-docker run -d --name my-redis --restart always redis:7-alpine # Run redis with restart policy
-docker create --name my-node node:24-alpine # Create node container without starting
-docker start my-node # Start the node container
-docker exec -it my-node sh # Enter shell in node container
-docker exec -it my-redis redis-cli # Open Redis CLI inside container
-docker cp ./localfile.txt my-node:/app/ # Copy file from host to container
-docker cp my-node:/app/file.txt ./hostfile.txt # Copy file from container to host
+docker run -d -p 8080:80 nginx:alpine     # Detached nginx
+docker run -d --name my-redis --restart always redis:7-alpine   # Redis with restart policy
+
+docker create --name my-node node:24-alpine   # Create container but don't start
+docker start my-node                           # Start container manually
+
+docker exec -it my-node sh                     # Open shell in Node container
+docker exec -it my-redis redis-cli             # Use Redis CLI inside container
+
+docker cp ./localfile.txt my-node:/app/        # Copy file to container
+docker cp my-node:/app/file.txt ./hostfile.txt # Copy file from container
+
 
 ## 3. Monitoring and Troubleshooting
 
 # Purpose: Observe containers and inspect details
 
-docker stats # Monitor container resources
-docker logs -f --timestamps nginx # Follow logs with timestamps
-docker inspect my-node # Inspect container configuration
-docker volume create my-volume # Create Docker volume
-docker run -v my-volume:/data redis # Attach volume to container
+docker stats                           # Live resource usage
+docker logs -f --timestamps nginx  # Follow logs with timestamps
+
+docker inspect my-node                # Inspect container config
+
+docker volume create my-volume        # Create volume
+docker run -v my-volume:/data redis   # Test volume with redis
+
 
 ## 4. Cleanup and Maintenance
 
 # Purpose: Stop containers, remove resources, clean system
 
-docker stop $(docker ps -q) # Stop all running containers
-docker rm $(docker ps -a -q) # Remove all containers
-docker rmi $(docker images -q) # Remove all images
-docker volume rm $(docker volume ls -q) # Remove all volumes
-docker network prune -f # Remove unused networks
+docker stop $(docker ps -q)            # Stop all containers
+docker rm $(docker ps -a -q)           # Remove all containers
+docker rmi $(docker images -q)         # Remove all images
+docker volume rm $(docker volume ls -q)# Remove all volumes
+docker network prune -f                # Clean up networks
+
 
 ## 5. Docker System Disk Usage
 
-# Purpose: Check disk usage before and after cleanup
-
 # BEFORE CLEANUP
 
-TYPE TOTAL ACTIVE SIZE RECLAIMABLE
-Images 19 4 5.625GB 5.263GB (93%)
-Containers 5 3 106.5kB 8.192kB (7%)
-Local Volumes 10 2 293.9MB 293.9MB (99%)
-Build Cache 35 0 22.76MB 22.76MB
+TYPE            TOTAL   ACTIVE   SIZE      RECLAIMABLE
+Images          19      4        5.625GB   5.263GB (93%)
+Containers      5       3        106.5kB   8.192kB (7%)
+Local Volumes   10      2        293.9MB   293.9MB (99%)
+Build Cache     35      0        22.76MB   22.76MB
+
 
 # AFTER CLEANUP
 
-TYPE TOTAL ACTIVE SIZE RECLAIMABLE
-Images 0 0 911MB 911MB (100%)
-Containers 0 0 0B 0B
-Local Volumes 0 0 0B 0B
-Build Cache 35 0 1.187GB 1.187GB
+TYPE            TOTAL   ACTIVE   SIZE      RECLAIMABLE
+Images          0       0        911MB     911MB (100%)
+Containers      0       0        0B        0B
+Local Volumes   0       0        0B        0B
+Build Cache     35      0        1.187GB   1.187GB
 
-## 6. Example of Container Inspection
 
 ## 6. Example of Container Inspection
 
 docker inspect my-nginx
 [
-{
-"Id": "760d79d79a91d41acf66a0b13e214b6d663ecb9f95edbeeb63a6270f3dd12f88",
-"Name": "/my-nginx",
-"Image": "nginx:alpine",
-"State": {
-"Status": "created",
-"Running": false,
-"ExitCode": 128
-},
-"HostConfig": {
-"PortBindings": {
-"80/tcp": [
-{ "HostPort": "8080" }
+  {
+    "Id": "760d79d79a91d41acf66a0b13e214b6d663ecb9f95edbeeb63a6270f3dd12f88",
+    "Name": "/my-nginx",
+    "Image": "nginx:alpine",
+    "State": {
+      "Status": "created",
+      "Running": false,
+      "ExitCode": 128
+    },
+    "HostConfig": {
+      "PortBindings": {
+        "80/tcp": [
+          { "HostPort": "8080" }
+        ]
+      }
+    }
+  }
 ]
-}
-}
-}
-]
+
 
 ## 7. Example of Container Logs
 
@@ -103,15 +114,8 @@ docker logs festive_hypatia
 
 ## 8. Most Useful Docker Commands
 
-# List of most helpful commands during this task:
-
-# - docker stats
-
-# - docker logs -f --timestamps
-
-# - docker exec -it <container> sh
-
-# - docker cp
-
-# - docker system prune -f
-
+docker stats
+docker logs -f --timestamps
+docker exec -it <container> sh
+docker cp
+docker system prune -f
